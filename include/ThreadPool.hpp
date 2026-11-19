@@ -1,26 +1,28 @@
-#ifndef THREAD_POOL_HPP
-#define THREAD_POOL_HPP
+#pragma once
 
 #include <functional>
 #include <queue>
 #include <thread>
 #include <vector>
+#include <mutex>
+#include <condition_variable>
 
 class ThreadPool
 {
 public:
-    explicit ThreadPool(size_t numThreads);
+    explicit ThreadPool(size_t num_threads = std::thread::hardware_concurrency());
     ~ThreadPool();
 
     void enqueue_task(std::function<void()> task);
+	void shutdown();
 
 private:
-    size_t m_num_threads;
+    std::mutex m_queue_mutex;
+    std::condition_variable cv;
+    bool m_shutdown = false;
     std::queue<std::function<void()>> m_task_queue;
     std::vector<std::thread> m_workers;
-    // bool m_shutdown = false;
+    
 
     void worker_thread_loop();
 };
-
-#endif // THREAD_POOL_HPP

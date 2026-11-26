@@ -10,9 +10,9 @@ add_library(thread_pool STATIC src/ThreadPool.cpp)
 target_include_directories(thread_pool PUBLIC include)
 target_link_libraries(thread_pool PUBLIC Threads::Threads)
 
-# --- main program ---
-add_executable(app src/main.cpp)
-target_link_libraries(app PRIVATE thread_pool)
+# --- example program ---
+add_executable(example examples/example.cpp)
+target_link_libraries(example PRIVATE thread_pool)
 
 # --- tests ---
 include(FetchContent)

@@ -14,10 +14,12 @@ ThreadPool::ThreadPool(size_t num_threads)
     }
 }
 
+
 ThreadPool::~ThreadPool()
 {
     shutdown();
 }
+
 
 void ThreadPool::enqueue_task(std::function<void()> task)
 {
@@ -31,22 +33,26 @@ void ThreadPool::enqueue_task(std::function<void()> task)
     cv.notify_one();
 }
 
-// Gracefully shutdown the thread pool, waiting for all tasks to complete. must not be called from a task running in the pool, as it will cause a deadlock.
+
+// Gracefully shuts down the pool: stops accepting tasks, lets workers finish everything already queued, and joins them.
+// Thread-safe: every caller blocks until the workers have joined, so when it returns the pool is fully stopped.
+// Must not be called from a task running in the pool (a worker would try to join itself).
 void ThreadPool::shutdown()
 {
     {
-	    std::scoped_lock lock(m_queue_mutex);
-		if (m_shutdown) return; // already shutdown
-	    m_shutdown = true;
+        std::scoped_lock lock(m_queue_mutex);
+        m_shutdown = true;
     }
     cv.notify_all();
 
+    std::scoped_lock join_lock(m_join_mutex);
     for (auto& worker : m_workers) {
-		if (worker.joinable()) {
-			worker.join();
-		}
+        if (worker.joinable()) {
+            worker.join();
+        }
     }
 }
+
 
 void ThreadPool::worker_thread_loop()
 {

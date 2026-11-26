@@ -100,6 +100,31 @@ TEST(ThreadPoolDtorTest, ShutdownTwiceThenDtor) {
     SUCCEED();
 }
 
+TEST(ThreadPoolDtorTest, ConcurrentShutdownCallersAllWaitForCompletion) {
+    std::atomic<int> counter{ 0 };
+    std::atomic<int> returned_early{ 0 };
+    {
+        ThreadPool pool{ 4 };
+        for (int i = 0; i < 20; ++i) {
+            pool.enqueue_task([&counter] {
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
+                ++counter;
+                });
+        }
+
+        std::vector<std::thread> callers;
+        for (int i = 0; i < 4; ++i) {
+            callers.emplace_back([&pool, &counter, &returned_early] {
+                pool.shutdown();
+                if (counter != 20) ++returned_early;   // shutdown returned before everything finished
+                });
+        }
+        for (auto& t : callers) t.join();   // join before the pool is destroyed (see the lifetime rule)
+    }
+    EXPECT_EQ(returned_early, 0);
+    EXPECT_EQ(counter, 20);
+}
+
 
 // ============ Edge Cases Tests ============
 
@@ -186,45 +211,3 @@ TEST(ThreadPoolConcurrencyTest, TasksWaitInQueue) {
     }
     EXPECT_EQ(counter, 100);
 }
-
-
-
-
-/*
-// TODO: decide what to do if a task assign a task after shutdown and test it.
-// draft:
-TEST(ThreadPoolConcurrencyTest, TaskEnqueueTaskAfterShutdown) {
-    std::atomic<int> counter{ 0 };
-    {
-        ThreadPool pool{};
-
-        // 10 tasks enqueuing 1000 tasks each
-        for (int i = 0; i < 10; ++i) {
-            pool.enqueue_task([&pool, &counter] {
-                for (int j = 0; j < 1000; ++j) {
-                    pool.enqueue_task([&counter] { ++counter; });
-                }
-
-                });
-        }
-
-    }  // destruction here. the tasks probably didn't finish enqueue all their tasks.
-
-    // EXPECT_EQ(counter, 10000);   OR
-    // EXPECT_THROW(...,  std::runtime_error);
-}
-*/
-
-
-
-// TODO: requires std::future.
-// how to implement this specific test?
-/* TEST(ThreadPoolConcurrencyTest, TasksRunOnDifferentThreads) {
-    std::atomic<int> counter{ 0 };
-    {
-        ThreadPool pool(4);
-        int thread_id = pool.enqueue_task([] { return std::this_thread::get_id(); });
-    }
-    EXPECT_NE(std::this_thread::get_id(), thread_id);
-} */
-// TODO: TasksRunOnDifferentCores???

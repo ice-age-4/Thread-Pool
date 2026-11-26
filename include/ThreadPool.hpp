@@ -6,6 +6,7 @@
 #include <vector>
 #include <mutex>
 #include <condition_variable>
+#include <cstddef>
 
 class ThreadPool
 {
@@ -29,6 +30,7 @@ private:
     std::condition_variable cv;
     bool m_shutdown = false;
     std::queue<std::function<void()>> m_task_queue;
+    std::mutex m_join_mutex;   // serializes the join phase of shutdown()
     std::vector<std::thread> m_workers;
     
 
